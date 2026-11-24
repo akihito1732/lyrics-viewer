@@ -1,5 +1,5 @@
 // 歌詞ビューア: アプリ本体だけをキャッシュする。Spotify / LRCLIB など外部のAPIには触れない。
-const CACHE = 'lyrics-viewer-v2';
+const CACHE = 'lyrics-viewer-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 const INDEX = new URL('./index.html', self.registration.scope).href;
 
