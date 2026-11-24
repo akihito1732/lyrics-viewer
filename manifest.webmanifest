@@ -1,0 +1,16 @@
+{
+  "name": "歌詞ビューア",
+  "short_name": "歌詞",
+  "description": "Spotifyで再生中の曲の歌詞を、再生位置に合わせて表示します",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101322",
+  "theme_color": "#101322",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

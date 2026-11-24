@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101322">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="歌詞">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>歌詞ビューア</title>
+<style>
+:root{--bg:#101322;--fg:#f1eee8;--dim:rgba(241,238,232,.32);--sub:rgba(241,238,232,.6);--card:#1a1e33;--line:rgba(255,255,255,.12);--acc:#a9b6ff;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root{--bg:#eef0f6;--fg:#161a2e;--dim:rgba(22,26,46,.3);--sub:rgba(22,26,46,.6);--card:#fff;--line:rgba(22,26,46,.14);--acc:#3d4fc4;color-scheme:light}}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif}
+button,input{font:inherit;color:inherit}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.5em .9em;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.primary{background:var(--acc);color:var(--bg);border-color:transparent;font-weight:600;width:100%;padding:.8em;margin-top:1.2em}
+a{color:var(--acc)}
+#setup{max-width:520px;margin:0 auto;padding:28px 20px}
+#setup h1{font-size:22px;margin:0 0 .4em}
+#setup ol{padding-left:1.3em;color:var(--sub)}
+#setup label{display:block;margin:1.2em 0 .3em;font-weight:600}
+#setup input{width:100%;padding:.7em;border-radius:8px;border:1px solid var(--line);background:var(--card)}
+.row{display:flex;gap:8px;align-items:stretch}
+code{flex:1;min-width:0;overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.5em .7em;font-size:13px}
+.warn{color:#e8a23c;font-size:14px}
+#main{height:100%;display:flex;flex-direction:column}
+header{display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+#cover{width:52px;height:52px;border-radius:6px;background:var(--card);object-fit:cover;flex:none}
+#meta{min-width:0}
+#title{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#artist{color:var(--sub);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lyrics{flex:1;overflow-y:auto;padding:38vh 20px;-webkit-mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent);mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent);scrollbar-width:none}
+#lyrics::-webkit-scrollbar{display:none}
+.l{margin:0 auto .55em;max-width:30em;font-family:"Hiragino Mincho ProN","Noto Serif JP","Yu Mincho",serif;font-size:clamp(22px,5.4vw,34px);line-height:1.45;color:var(--dim);transition:color .25s}
+.l.on{color:var(--fg)}
+.l.plain{color:var(--sub);font-size:clamp(18px,4.4vw,24px)}
+.note{max-width:30em;margin:0 auto 1.2em;color:var(--sub);font-family:inherit;font-size:14px}
+footer{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--sub)}
+footer .grp{display:flex;gap:6px;align-items:center}
+footer button{padding:.3em .7em}
+#off{min-width:3.6em;text-align:center;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<section id="setup" hidden>
+  <h1>歌詞ビューア</h1>
+  <p>Spotifyで再生中の曲の歌詞を、再生位置に合わせて表示します。最初に一度だけ設定します。</p>
+  <ol>
+    <li><a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify Developer Dashboard</a>でアプリを作成し、使用するAPIで Web API を選びます。</li>
+    <li>Redirect URIs に、下のURLをそのまま登録します。</li>
+    <li>Client ID を貼り付けて接続します。</li>
+  </ol>
+  <label>Redirect URI</label>
+  <div class="row"><code id="ruri"></code><button id="copy" type="button">コピー</button></div>
+  <label for="cid">Client ID</label>
+  <input id="cid" autocomplete="off" spellcheck="false" placeholder="32文字の英数字">
+  <button id="login" class="primary" type="button">Spotifyに接続</button>
+  <p id="warn" class="warn" hidden></p>
+</section>
+
+<section id="main" hidden>
+  <header>
+    <img id="cover" alt="" hidden>
+    <div id="meta"><div id="title">再生待ち</div><div id="artist"></div></div>
+  </header>
+  <div id="lyrics"></div>
+  <footer>
+    <div class="grp">
+      <span>タイミング</span>
+      <button id="offm" type="button" aria-label="歌詞を0.5秒遅らせる">−</button>
+      <span id="off">0.0秒</span>
+      <button id="offp" type="button" aria-label="歌詞を0.5秒早める">＋</button>
+    </div>
+    <button id="logout" type="button">接続を解除</button>
+  </footer>
+</section>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: k => { try { localStorage.removeItem(k); } catch {} }
+};
+const REDIRECT = location.origin + location.pathname;
+const SCOPE = 'user-read-currently-playing user-read-playback-state';
+
+/* ---------- 認証 (Authorization Code + PKCE) ---------- */
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const rand = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return b64(a).slice(0, n); };
+
+async function login() {
+  const id = $('#cid').value.trim();
+  if (!id) { $('#cid').focus(); return; }
+  store.set('cid', id);
+  const verifier = rand(64), state = rand(16);
+  store.set('verifier', verifier); store.set('state', state);
+  const challenge = b64(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  location.href = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
+    response_type: 'code', client_id: id, scope: SCOPE, redirect_uri: REDIRECT,
+    state, code_challenge_method: 'S256', code_challenge: challenge
+  });
+}
+
+async function tokenReq(body) {
+  const r = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: store.get('cid'), ...body })
+  });
+  if (!r.ok) throw new Error('token ' + r.status);
+  const j = await r.json();
+  store.set('access', j.access_token);
+  store.set('exp', String(Date.now() + j.expires_in * 1000 - 30000));
+  if (j.refresh_token) store.set('refresh', j.refresh_token);
+}
+
+async function handleCallback() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has('code') && !p.has('error')) return;
+  history.replaceState(null, '', REDIRECT);
+  if (p.get('error') || p.get('state') !== store.get('state')) { warn('接続がキャンセルされたか、認証に失敗しました。もう一度お試しください。'); return; }
+  try {
+    await tokenReq({ grant_type: 'authorization_code', code: p.get('code'), redirect_uri: REDIRECT, code_verifier: store.get('verifier') });
+  } catch { warn('トークンを取得できませんでした。Client ID と Redirect URI の登録内容を確認してください。'); }
+}
+
+async function token() {
+  if (Date.now() > Number(store.get('exp') || 0)) {
+    const rt = store.get('refresh');
+    if (!rt) return null;
+    try { await tokenReq({ grant_type: 'refresh_token', refresh_token: rt }); }
+    catch { logout(); return null; }
+  }
+  return store.get('access');
+}
+
+function logout() {
+  ['access', 'refresh', 'exp'].forEach(store.del);
+  cur = null; lines = [];
+  showSetup();
+}
+
+/* ---------- 再生状態のポーリング ---------- */
+let cur = null, base = 0, t0 = 0, playing = false, backoff = 0, polling = false;
+let offset = Number(store.get('off') || 0);
+const pos = () => (base + (playing ? performance.now() - t0 : 0)) / 1000 + offset;
+
+async function poll() {
+  const tk = await token();
+  if (!tk) { polling = false; return; }
+  try {
+    const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { Authorization: 'Bearer ' + tk } });
+    if (r.status === 204) idle('Spotifyで曲を再生すると、ここに歌詞が出ます。');
+    else if (r.status === 429) backoff = (Number(r.headers.get('Retry-After')) || 5) * 1000;
+    else if (r.status === 401) store.set('exp', '0');
+    else if (r.ok) onState(await r.json());
+  } catch {}
+  const wait = Math.max(3000, backoff); backoff = 0;
+  setTimeout(poll, wait);
+}
+
+function onState(j) {
+  if (!j.item || j.currently_playing_type !== 'track') {
+    idle(j.currently_playing_type === 'ad' ? '広告の再生中です。' : '曲以外のコンテンツを再生中です。');
+    return;
+  }
+  base = j.progress_ms; t0 = performance.now(); playing = j.is_playing;
+  if (cur && cur.id === j.item.id) return;
+  const it = j.item;
+  cur = {
+    id: it.id, name: it.name, artists: it.artists.map(a => a.name),
+    album: it.album.name, dur: it.duration_ms / 1000,
+    img: (it.album.images[1] || it.album.images[0] || {}).url
+  };
+  $('#title').textContent = cur.name;
+  $('#artist').textContent = cur.artists.join(', ');
+  const c = $('#cover');
+  if (cur.img) { c.src = cur.img; c.hidden = false; } else c.hidden = true;
+  loadLyrics(cur);
+}
+
+function idle(msg) {
+  cur = null; lines = []; active = -1; playing = false;
+  $('#title').textContent = '再生待ち'; $('#artist').textContent = ''; $('#cover').hidden = true;
+  message(msg);
+}
+
+/* ---------- 歌詞の取得 (LRCLIB) ---------- */
+const cache = new Map();
+const lr = async (path, params) => {
+  const r = await fetch('https://lrclib.net/api/' + path + '?' + new URLSearchParams(params));
+  return r.ok ? r.json() : null;
+};
+
+async function fetchLyrics(t) {
+  const clean = t.name.replace(/\s*[-–(].*$/, '').trim() || t.name;
+  try {
+    const d = await lr('get', { track_name: t.name, artist_name: t.artists[0], album_name: t.album, duration: Math.round(t.dur) });
+    if (d && (d.syncedLyrics || d.plainLyrics || d.instrumental)) return d;
+    const res = await lr('search', { track_name: clean, artist_name: t.artists[0] });
+    if (Array.isArray(res)) {
+      const ok = res.filter(x => Math.abs((x.duration || 0) - t.dur) <= 3 && (x.syncedLyrics || x.plainLyrics));
+      ok.sort((a, b) => !!b.syncedLyrics - !!a.syncedLyrics);
+      if (ok[0]) return ok[0];
+    }
+  } catch { return { error: true }; }
+  return null;
+}
+
+async function loadLyrics(t) {
+  lines = []; active = -1;
+  message('歌詞を探しています…');
+  let d = cache.get(t.id);
+  if (!d) { d = await fetchLyrics(t); if (d && !d.error) cache.set(t.id, d); }
+  if (!cur || cur.id !== t.id) return;
+  render(d);
+}
+
+function parseLRC(s) {
+  const out = [];
+  for (const ln of s.split('\n')) {
+    const re = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+    let m, last = 0; const ts = [];
+    while ((m = re.exec(ln))) { ts.push(+m[1] * 60 + +m[2]); last = re.lastIndex; }
+    const x = ln.slice(last).trim();
+    ts.forEach(t => out.push({ t, x: x || '♪' }));
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+/* ---------- 表示 ---------- */
+let lines = [], active = -1;
+const box = $('#lyrics');
+
+function message(txt) {
+  box.textContent = '';
+  const p = document.createElement('p'); p.className = 'note'; p.textContent = txt; box.append(p);
+}
+
+function render(d) {
+  if (!d) return message('この曲の歌詞は見つかりませんでした。');
+  if (d.error) return message('歌詞サービスに接続できませんでした。しばらくしてからもう一度お試しください。');
+  if (d.instrumental && !d.syncedLyrics && !d.plainLyrics) return message('インストゥルメンタルです。');
+  box.textContent = '';
+  if (d.syncedLyrics) {
+    lines = parseLRC(d.syncedLyrics);
+    lines.forEach(l => { const p = document.createElement('p'); p.className = 'l'; p.textContent = l.x; box.append(p); });
+    tick();
+  } else {
+    const n = document.createElement('p'); n.className = 'note'; n.textContent = 'この曲は同期歌詞がないため、全文を表示しています。'; box.append(n);
+    d.plainLyrics.split('\n').forEach(x => { const p = document.createElement('p'); p.className = 'l plain'; p.textContent = x || '\u00a0'; box.append(p); });
+  }
+}
+
+function tick() {
+  if (!lines.length) return;
+  const p = pos(); let i = -1;
+  for (let k = 0; k < lines.length; k++) { if (lines[k].t <= p) i = k; else break; }
+  if (i === active) return;
+  const ch = box.children;
+  if (active >= 0 && ch[active]) ch[active].classList.remove('on');
+  active = i;
+  if (i >= 0 && ch[i]) {
+    ch[i].classList.add('on');
+    ch[i].scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+}
+
+/* ---------- 画面切り替え・初期化 ---------- */
+function warn(t) { const w = $('#warn'); w.textContent = t; w.hidden = false; }
+function showSetup() { $('#main').hidden = true; $('#setup').hidden = false; $('#cid').value = store.get('cid') || ''; }
+function showMain() { $('#setup').hidden = true; $('#main').hidden = false; if (!polling) { polling = true; message('Spotifyで曲を再生すると、ここに歌詞が出ます。'); poll(); } }
+function setOff(v) { offset = Math.round(v * 10) / 10; store.set('off', String(offset)); $('#off').textContent = (offset > 0 ? '+' : '') + offset.toFixed(1) + '秒'; active = -1; tick(); }
+
+$('#ruri').textContent = REDIRECT;
+$('#login').onclick = login;
+$('#logout').onclick = logout;
+$('#offm').onclick = () => setOff(offset - 0.5);
+$('#offp').onclick = () => setOff(offset + 0.5);
+$('#copy').onclick = async e => { try { await navigator.clipboard.writeText(REDIRECT); e.target.textContent = 'コピーしました'; setTimeout(() => e.target.textContent = 'コピー', 1500); } catch {} };
+setInterval(tick, 150);
+setOff(offset);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+(async () => {
+  await handleCallback();
+  if (store.get('refresh')) showMain();
+  else {
+    showSetup();
+    if (location.protocol === 'file:') warn('ファイルを直接開いても接続できません。HTTPSで公開するか、VS Code の Live Server などで 127.0.0.1 から開いてください。');
+    else if (location.hostname === 'localhost') warn('Spotifyは localhost を Redirect URI に使えません。127.0.0.1 でアクセスし直してください。');
+  }
+})();
+</script>
+</body>
+</html>
